@@ -1,3 +1,10 @@
 # 应用服务 WEB 访问端口
-server.port=8080
+server:
+  port: 8080
+
+qywx:
+  corpid: wx9b84bf1811293db4
+  corpsecret: 5salYi0WW2_7ViS2yDuAt_WmOysWpqAmM-u9CHU4ZL4
+  appId: 1000010
+
 

@@ -1,0 +1,5 @@
+spring:
+  mail:
+    host: smtp.exmail.qq.com
+    username: admin@nfshare.cn
+    password: WVRBs3DLYJB6GDYj

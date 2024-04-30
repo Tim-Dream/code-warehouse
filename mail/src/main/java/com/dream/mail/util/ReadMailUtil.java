@@ -1,16 +1,24 @@
 package com.dream.mail.util;
 
 import com.dream.mail.config.MailProperties;
+import com.dream.mail.model.MailModel;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import javax.mail.*;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
 import javax.mail.internet.MimeUtility;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.util.Properties;
+import java.io.UnsupportedEncodingException;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
+@Slf4j
 @Component
 @AllArgsConstructor
 public class ReadMailUtil {
@@ -18,7 +26,7 @@ public class ReadMailUtil {
     private MailProperties properties;
 
     @SneakyThrows
-    public void test(){
+    public List<MailModel> readMail(String lastMailId){
         Properties prop = new Properties();
         prop.setProperty("mail.store.protocol", "imap");
         prop.setProperty("mail.imap.host", properties.getHost());
@@ -42,41 +50,35 @@ public class ReadMailUtil {
         Message[] messages = folder.getMessages();
 
         // 打印不同状态的邮件数量
-        System.out.println("收件箱中共" + messages.length + "封邮件!");
-        System.out.println("收件箱中共" + folder.getUnreadMessageCount() + "封未读邮件!");
-        System.out.println("收件箱中共" + folder.getNewMessageCount() + "封新邮件!");
-        System.out.println("收件箱中共" + folder.getDeletedMessageCount() + "封已删除邮件!");
+        log.info("收件箱中共" + messages.length + "封邮件!");
+        log.info("收件箱中共" + folder.getUnreadMessageCount() + "封未读邮件!");
+        log.info("收件箱中共" + folder.getNewMessageCount() + "封新邮件!");
+        log.info("------------------------开始解析邮件----------------------------------");
 
-        System.out.println("------------------------开始解析邮件----------------------------------");
-
-
-        int total = folder.getMessageCount();
-        System.out.println("-----------------您的邮箱共有邮件：" + total + " 封--------------");
+        List<MailModel> list = new ArrayList<>();
         // 得到收件箱文件夹信息，获取邮件列表
-        Message[] msgs = folder.getMessages();
-        System.out.println("\t收件箱的总邮件数：" + msgs.length);
-        for (int i = 0; i < total; i++) {
-            Message a = msgs[i];
+        for (int i = messages.length-1; i > 0; i--) {
+            MimeMessage a = (MimeMessage)messages[i];
+            if(StringUtils.hasText(lastMailId) && lastMailId.equals(a.getMessageID())){
+                break;
+            }
             //   获取邮箱邮件名字及时间
-
             StringBuffer content = new StringBuffer(30);
             getMailTextContent(a,content);
-            System.out.println("邮件正文："+content);
-            Address[] address = a.getReplyTo();
-            Address[] from = a.getFrom();
-
-            System.out.println("==============");
-//                System.out.println(a.getSubject() + "   接收时间：" + a.getReceivedDate().toLocaleString()+"  contentType()" +a.getContentType());
+            MailModel mailModel = new MailModel();
+            mailModel.setId(a.getMessageID());
+            mailModel.setEmail(getReceiveAddress(a, null));
+            mailModel.setSubject(getSubject(a));
+            mailModel.setReceiveTime(getSentDate(a,null));
+            mailModel.setContent(content.toString());
+            list.add(mailModel);
+            log.info("==============");
         }
-        System.out.println("\t未读邮件数：" + folder.getUnreadMessageCount());
-        System.out.println("\t新邮件数：" + folder.getNewMessageCount());
-        System.out.println("----------------End------------------");
-
-
-
+        log.info("----------------End------------------");
         // 关闭资源
         folder.close(false);
         store.close();
+        return list;
     }
 
 
@@ -103,5 +105,67 @@ public class ReadMailUtil {
                 getMailTextContent(bodyPart, content);
             }
         }
+    }
+
+
+    /**
+     * 获得邮件主题
+     *
+     * @param msg 邮件内容
+     * @return 解码后的邮件主题
+     */
+    @SneakyThrows
+    public static String getSubject(MimeMessage msg){
+        return MimeUtility.decodeText(msg.getSubject());
+    }
+
+    /**
+     * 根据收件人类型，获取邮件收件人、抄送和密送地址。如果收件人类型为空，则获得所有的收件人
+     * <p>Message.RecipientType.TO  收件人</p>
+     * <p>Message.RecipientType.CC  抄送</p>
+     * <p>Message.RecipientType.BCC 密送</p>
+     *
+     * @param msg  邮件内容
+     * @param type 收件人类型
+     * @return  邮件地址1,邮件地址2, ...
+     */
+    @SneakyThrows
+    public static String getReceiveAddress(MimeMessage msg, Message.RecipientType type) {
+        StringBuffer receiveAddress = new StringBuffer();
+        Address[] addresss = null;
+        if (type == null) {
+            addresss = msg.getAllRecipients();
+        } else {
+            addresss = msg.getRecipients(type);
+        }
+
+        if (addresss == null || addresss.length < 1)
+            throw new MessagingException("没有收件人!");
+        for (Address address : addresss) {
+            InternetAddress internetAddress = (InternetAddress) address;
+            receiveAddress.append(internetAddress.getAddress()).append(",");
+        }
+
+        receiveAddress.deleteCharAt(receiveAddress.length() - 1); //删除最后一个逗号
+
+        return receiveAddress.toString();
+    }
+
+    /**
+     * 获得邮件发送时间
+     *
+     * @param msg 邮件内容
+     * @return yyyy年mm月dd日 星期X HH:mm
+     */
+    @SneakyThrows
+    public static String getSentDate(MimeMessage msg, String pattern) {
+        Date receivedDate = msg.getSentDate();
+        if (receivedDate == null)
+            return "";
+
+        if (pattern == null || "".equals(pattern))
+            pattern = "yyyy-MM-dd HH:mm:ss ";
+
+        return new SimpleDateFormat(pattern).format(receivedDate);
     }
 }

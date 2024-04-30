@@ -1,5 +1,6 @@
 package com.dream.mail;
 
+import com.dream.mail.model.MailModel;
 import com.dream.mail.util.ReadMailUtil;
 import com.dream.mail.util.SendMailUtil;
 import org.junit.jupiter.api.Test;
@@ -7,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @SpringBootTest
@@ -39,7 +41,8 @@ class MailApplicationTests {
 
     @Test
     void test() {
-        readMailUtil.test();
+        List<MailModel> list = readMailUtil.readMail("<0101018f2b1dccf1-3462ec69-18c3-44f6-bd1a-5908c919fd14-000000@us-west-2.amazonses.com>");
+        System.out.println(list);
     }
 
 }
